@@ -55,7 +55,21 @@ $pdf->AliasNbPages(); // Penting untuk mengetahui total halaman
 
 // Parameter yang akan diteruskan ke builder
 $params = $_REQUEST; // Gunakan $_REQUEST untuk menerima GET dan POST
-$params['user_id'] = 1; // ID Pemilik Data (Toko)
+
+// Validasi session user_id
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized - Silakan login terlebih dahulu']);
+    exit;
+}
+
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || $_SESSION['user_id'] <= 0) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Forbidden - Session tidak valid']);
+    exit;
+}
+
+$params['user_id'] = (int)$_SESSION['user_id'];
 
 // Peta dari tipe laporan ke kelas builder-nya
 $builder_map = [

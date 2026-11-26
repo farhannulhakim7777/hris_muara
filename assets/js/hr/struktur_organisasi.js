@@ -1,6 +1,25 @@
 let salaryTrendChartInstance = null;
 let currentZoom = 1;
 
+// Load divisi options for filter
+async function loadDivisiOptions() {
+    try {
+        const response = await fetch(`${basePath}/api/hr/divisi`);
+        const result = await response.json();
+        if (result.success) {
+            const select = document.getElementById('filter-divisi-struktur');
+            if (select) {
+                select.innerHTML = '<option value="">Semua Divisi</option>';
+                result.data.forEach(divisi => {
+                    select.insertAdjacentHTML('beforeend', `<option value="${divisi.id}">${divisi.nama_divisi}</option>`);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load divisi options:', error);
+    }
+}
+
 function initStrukturOrganisasiPage() {
     // Pastikan Google Charts dimuat sebelum digunakan
     if (typeof loadGoogleCharts === 'function') {
@@ -41,40 +60,100 @@ function initStrukturOrganisasiPage() {
 
     if (exportPdfBtn && container) {
         exportPdfBtn.addEventListener('click', async () => {
+            // Cek ketersediaan library
+            if (typeof html2canvas === 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Library Error',
+                    text: 'Library html2canvas tidak dimuat. Silakan refresh halaman.'
+                });
+                return;
+            }
+
+            if (typeof window.jspdf === 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Library Error',
+                    text: 'Library jsPDF tidak dimuat. Silakan refresh halaman.'
+                });
+                return;
+            }
+
             const originalTransform = container.style.transform;
             const originalBtnText = exportPdfBtn.innerHTML;
-            
+            const isExporting = exportPdfBtn.disabled;
+
+            // Cegah double-click
+            if (isExporting) return;
+
             try {
                 exportPdfBtn.disabled = true;
-                exportPdfBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Memproses...';
-                
-                // Reset zoom sementara agar capture full size dan resolusi bagus
-                container.style.transform = 'scale(1)';
-                
-                // Tunggu sebentar agar render ulang selesai
-                await new Promise(resolve => setTimeout(resolve, 100));
+                exportPdfBtn.innerHTML = '<span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span> Memproses...';
 
+                // Reset zoom sementara
+                container.style.transform = 'scale(1)';
+                await new Promise(resolve => setTimeout(resolve, 200));
+
+                // Get actual size
+                const actualWidth = Math.max(container.scrollWidth, container.offsetWidth);
+                const actualHeight = Math.max(container.scrollHeight, container.offsetHeight);
+
+                // Capture dengan html2canvas
                 const canvas = await html2canvas(container, {
-                    scale: 2, // Tingkatkan resolusi
-                    backgroundColor: '#ffffff'
+                    scale: 2,
+                    backgroundColor: '#ffffff',
+                    width: actualWidth,
+                    height: actualHeight,
+                    windowWidth: actualWidth,
+                    windowHeight: actualHeight,
+                    scrollX: 0,
+                    scrollY: 0,
+                    useCORS: true,
+                    allowTaint: true
                 });
 
                 const imgData = canvas.toDataURL('image/png');
                 const { jsPDF } = window.jspdf;
-                // Landscape A4
-                const pdf = new jsPDF('l', 'mm', 'a4');
-                const imgProps = pdf.getImageProperties(imgData);
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                
+
+                // Get image dimensions from canvas directly
+                const imgWidth = canvas.width;
+                const imgHeight = canvas.height;
+
+                // Dynamic page size
+                const a4Width = 297;
+                const a4Height = 210;
+                const ratio = imgWidth / imgHeight;
+
+                let pdfWidth, pdfHeight;
+
+                if (imgWidth > imgHeight) {
+                    pdfWidth = a4Width;
+                    pdfHeight = pdfWidth / ratio;
+                } else {
+                    pdfHeight = a4Height;
+                    pdfWidth = pdfHeight * ratio;
+                }
+
+                const pdf = new jsPDF(pdfWidth > pdfHeight ? 'l' : 'p', 'mm', 'a4');
                 pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
                 pdf.save('struktur-organisasi.pdf');
 
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil',
+                    text: 'PDF berhasil diunduh.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
             } catch (error) {
                 console.error('Export PDF failed:', error);
-                alert('Gagal mengekspor PDF.');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: 'Gagal mengekspor PDF: ' + error.message
+                });
             } finally {
-                // Kembalikan zoom dan tombol
                 container.style.transform = originalTransform;
                 exportPdfBtn.disabled = false;
                 exportPdfBtn.innerHTML = originalBtnText;

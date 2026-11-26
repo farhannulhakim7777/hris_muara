@@ -22,7 +22,19 @@ require_once PROJECT_ROOT . '/includes/Repositories/LaporanRepository.php';
 require_once PROJECT_ROOT . '/includes/ReportBuilders/PertumbuhanLabaReportBuilder.php';
 
 $conn = Database::getInstance()->getConnection();
-$user_id = 1; // ID Pemilik Data (Toko)
+
+// Validasi session user_id
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+    http_response_code(401);
+    die('Unauthorized - Silakan login terlebih dahulu');
+}
+
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || $_SESSION['user_id'] <= 0) {
+    http_response_code(403);
+    die('Forbidden - Session tidak valid');
+}
+
+$user_id = (int)$_SESSION['user_id'];
 
 $report_type = $_GET['report'] ?? '';
 $format = $_GET['format'] ?? 'csv';
