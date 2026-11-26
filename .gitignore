@@ -1,0 +1,29 @@
+# Environment files
+.env
+
+# Log files
+*.log
+error_log
+
+# Debug files
+debug_*.php
+*/debug_*.php
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Vendor (if using composer)
+/vendor/
+node_modules/
+
+# Cache
+/cache/
+/tmp/
