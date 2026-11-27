@@ -14,6 +14,14 @@ class AuthMiddleware implements MiddlewareInterface
     public function handle(): void
     {
         if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+            // Jika request adalah API, kembalikan HTTP 401 Unauthorized JSON
+            if (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], '/api/') !== false) {
+                http_response_code(401);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+                exit;
+            }
+
             header('Location: ' . $this->basePath . '/login');
             exit;
         }

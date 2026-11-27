@@ -386,11 +386,93 @@ body {
 .sidebar-nav .nav-link {
     color: var(--text-secondary);
     padding: 0.75rem var(--spacing-lg);
-    margin: 0.25rem var(--spacing-md);
+    margin: 0.5rem var(--spacing-md);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
     font-weight: 500;
     font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: visible;
+    line-height: 1.75;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+}
+
+/* Collapse content transition */
+.collapse-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+}
+
+.collapse-content:not(.hidden) {
+    max-height: 2000px;
+}
+
+/* Small mobile (320px - 430px) */
+@media (max-width: 430px) {
+    .sidebar {
+        width: 100%;
+        max-width: 280px;
+    }
+    
+    .sidebar-nav .nav-link {
+        padding: 0.6rem var(--spacing-md);
+        margin: 0.4rem var(--spacing-sm);
+        font-size: 0.8125rem;
+        min-height: 40px;
+    }
+    
+    .collapse-content {
+        max-height: 0;
+    }
+    
+    .collapse-content:not(.hidden) {
+        max-height: 1500px;
+    }
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .sidebar {
+        width: 240px;
+    }
+    
+    .sidebar-nav .nav-link {
+        padding: 0.7rem var(--spacing-md);
+        margin: 0.45rem var(--spacing-sm);
+        font-size: 0.85rem;
+        min-height: 42px;
+    }
+}
+
+/* Laptop (1024px - 1365px) */
+@media (min-width: 1024px) and (max-width: 1365px) {
+    .sidebar {
+        width: 250px;
+    }
+    
+    .sidebar-nav .nav-link {
+        padding: 0.75rem var(--spacing-lg);
+        margin: 0.5rem var(--spacing-md);
+        font-size: 0.875rem;
+        min-height: 44px;
+    }
+}
+
+/* Desktop (1366px+) */
+@media (min-width: 1366px) {
+    .sidebar {
+        width: 260px;
+    }
+    
+    .sidebar-nav .nav-link {
+        padding: 0.75rem var(--spacing-lg);
+        margin: 0.5rem var(--spacing-md);
+        font-size: 0.875rem;
+        min-height: 44px;
+    }
 }
 
 .sidebar-nav .nav-link:hover {

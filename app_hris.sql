@@ -236,7 +236,15 @@ CREATE TABLE `hr_absensi` (
   `foto_masuk` varchar(255) DEFAULT NULL,
   `foto_keluar` varchar(255) DEFAULT NULL,
   `lokasi_masuk` varchar(255) DEFAULT NULL,
+  `latitude_masuk` decimal(20,16) DEFAULT NULL,
+  `longitude_masuk` decimal(20,16) DEFAULT NULL,
+  `accuracy_masuk` decimal(10,2) DEFAULT NULL,
+  `jarak_masuk` decimal(10,2) DEFAULT NULL,
   `lokasi_keluar` varchar(255) DEFAULT NULL,
+  `latitude_keluar` decimal(20,16) DEFAULT NULL,
+  `longitude_keluar` decimal(20,16) DEFAULT NULL,
+  `accuracy_keluar` decimal(10,2) DEFAULT NULL,
+  `jarak_keluar` decimal(10,2) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -719,6 +727,10 @@ CREATE TABLE `hr_kantor` (
   `nama_kantor` varchar(100) NOT NULL,
   `jenis_kantor` enum('Pusat','Cabang','Lainnya') NOT NULL DEFAULT 'Cabang',
   `alamat` text DEFAULT NULL,
+  `latitude` decimal(20,16) DEFAULT NULL,
+  `longitude` decimal(20,16) DEFAULT NULL,
+  `attendance_radius` int(10) UNSIGNED NOT NULL DEFAULT 10,
+  `geofence_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

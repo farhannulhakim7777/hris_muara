@@ -52,8 +52,8 @@ $router->post('/reset-password', 'actions/reset_password_action.php', ['guest'])
 // Rute yang memerlukan otentikasi
 $router->get('/', function() {
     if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
-        // Cek Role: Jika Karyawan (ID 4), arahkan ke Portal
-        if (isset($_SESSION['role_id']) && $_SESSION['role_id'] == 4) {
+        // Cek Role: Jika Karyawan (ID 4 atau role karyawan), arahkan ke Portal
+        if ((isset($_SESSION['role_id']) && $_SESSION['role_id'] == 4) || strtolower($_SESSION['role'] ?? '') === 'karyawan') {
             header('Location: ' . base_url('/hr/portal/dashboard'));
         } else {
             header('Location: ' . base_url('/dashboard'));
@@ -65,7 +65,7 @@ $router->get('/', function() {
 });
 $router->get('/dashboard', function() {
     // Proteksi: Karyawan tidak boleh akses dashboard utama
-    if (isset($_SESSION['role_id']) && $_SESSION['role_id'] == 4) {
+    if ((isset($_SESSION['role_id']) && $_SESSION['role_id'] == 4) || strtolower($_SESSION['role'] ?? '') === 'karyawan') {
         header('Location: ' . base_url('/hr/portal/dashboard'));
         exit;
     }

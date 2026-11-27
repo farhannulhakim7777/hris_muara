@@ -165,11 +165,12 @@ async function navigate(url, pushState = true) {
         spinnerOverlay.classList.remove('opacity-0', 'pointer-events-none');
     }
 
-    // 1. Mulai animasi fade-out
+    // 1. Hapus konten lama segera untuk mencegah stacking
+    mainContent.innerHTML = '';
+    
+    // 2. Mulai animasi fade-in untuk konten baru
     mainContent.classList.add('is-transitioning');
     mainContent.style.opacity = '0';
-    // 2. Tunggu animasi fade-out selesai (durasi harus cocok dengan CSS)
-    await new Promise(resolve => setTimeout(resolve, 200));
 
     try {
         const response = await fetch(url, {
@@ -188,7 +189,7 @@ async function navigate(url, pushState = true) {
             history.pushState({ path: url }, '', url);
         }
 
-        // 3. Ganti konten saat tidak terlihat
+        // 3. Ganti konten
         mainContent.innerHTML = html;
         const pageTitle = document.querySelector('#main-content .h2, #main-content h1')?.textContent || 'Dashboard';
         document.getElementById('page-title').textContent = pageTitle;
@@ -282,7 +283,7 @@ function runPageScripts(path) {
         '/hr/jabatan': { script: 'hr/jabatan.js', init: 'initJabatanPage' },
         '/hr/divisi': { script: 'hr/divisi.js', init: 'initDivisiPage' },
         '/hr/master-dashboard': { script: 'hr/master_dashboard.js', init: 'initMasterDashboardPage' },
-        '/hr/kantor': { script: 'hr/kantor.js', init: 'initKantorPage' },
+        '/hr/kantor': { script: 'hr/kantor.js', init: 'initKantorPage', requires: 'leaflet' },
         '/hr/golongan-absensi': { script: 'hr/golonganabsensi.js', init: 'initGolonganAbsensiPage' },
         '/hr/status-absensi': { script: 'hr/statusabsensi.js', init: 'initStatusAbsensiPage' },
         '/hr/jadwal-kerja': { script: 'hr/jadwalkerja.js', init: 'initJadwalKerjaPage' },
@@ -343,6 +344,8 @@ function runPageScripts(path) {
             loadFullCalendar().then(executeScript).catch(console.error);
         } else if (route.requires === 'html5qrcode') {
             loadHtml5QrCode().then(executeScript).catch(console.error);
+        } else if (route.requires === 'leaflet') {
+            loadLeaflet().then(executeScript).catch(console.error);
         } else {
             executeScript();
         }
@@ -431,6 +434,30 @@ function loadHtml5QrCode() {
             return;
         }
         loadScript('https://unpkg.com/html5-qrcode')
+            .then(resolve)
+            .catch(reject);
+    });
+}
+
+/**
+ * Loads Leaflet library (CSS & JS) dynamically.
+ * @returns {Promise<void>}
+ */
+function loadLeaflet() {
+    return new Promise((resolve, reject) => {
+        if (typeof L !== 'undefined') {
+            resolve();
+            return;
+        }
+
+        if (!document.querySelector('link[href*="leaflet"]')) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(link);
+        }
+
+        loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js')
             .then(resolve)
             .catch(reject);
     });
@@ -580,8 +607,12 @@ function toggleCollapse(button) {
     if (content) {
         // If content is open (has a maxHeight), close it. Otherwise, open it.
         if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+            // Close: set maxHeight to 0 and add hidden class
             content.style.maxHeight = '0px';
+            content.classList.add('hidden');
         } else {
+            // Open: remove hidden class and set maxHeight to scrollHeight
+            content.classList.remove('hidden');
             content.style.maxHeight = content.scrollHeight + 'px';
         }
     }

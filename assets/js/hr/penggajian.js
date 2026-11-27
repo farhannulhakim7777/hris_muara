@@ -238,8 +238,18 @@ function renderPreviewTable(data) {
         window.toggleAccordion = function(button) {
             const content = button.nextElementSibling;
             const icon = button.querySelector('i.bi-chevron-down');
-            content.classList.toggle('hidden');
-            icon.classList.toggle('rotate-180');
+            
+            if (content.classList.contains('hidden')) {
+                // Show
+                content.classList.remove('hidden');
+                content.style.display = 'block';
+                icon.classList.remove('rotate-180');
+            } else {
+                // Hide
+                content.classList.add('hidden');
+                content.style.display = 'none';
+                icon.classList.add('rotate-180');
+            }
         }
     }
 }

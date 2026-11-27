@@ -182,8 +182,10 @@ try {
 // --- Terapkan Rate Limiting untuk API ---
 // Cek apakah permintaan saat ini adalah permintaan API
 if (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], '/api/') !== false) {    
-    // Verifikasi CSRF token untuk semua permintaan API yang mengubah data
-    verify_csrf_token();
+    // Verifikasi CSRF token untuk semua permintaan API yang mengubah data pada session yang login
+    if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
+        verify_csrf_token();
+    }
 
     // Batasi 60 permintaan per menit per IP
     $rateLimiter = new RateLimiter(60, 60); 

@@ -26,7 +26,7 @@ $conn = Database::getInstance()->getConnection();
 try {
     if ($method === 'GET' && (!isset($_GET['action']) || $_GET['action'] === 'list')) {
         // Ambil data karyawan dengan filter pencarian dan status
-        $sql = "SELECT k.*, j.nama_jabatan, d.nama_divisi, jk.nama_jadwal, kt.nama_kantor, gg.nama_golongan as nama_golongan_gaji,
+        $sql = "SELECT k.*, j.nama_jabatan, d.nama_divisi, jk.nama_jadwal, kt.nama_kantor, gg.nama_golongan as nama_golongan_gaji, u.username as username_user,
                 (SELECT id FROM hr_evaluasi_probation WHERE karyawan_id = k.id ORDER BY created_at DESC LIMIT 1) as latest_probation_evaluation_id,
                 (SELECT COUNT(*) FROM hr_evaluasi_probation WHERE karyawan_id = k.id) as probation_history_count,
                 (SELECT COUNT(*) FROM hr_riwayat_gaji WHERE karyawan_id = k.id) as salary_history_count
@@ -36,6 +36,7 @@ try {
                 LEFT JOIN hr_divisi d ON k.divisi_id = d.id
                 LEFT JOIN hr_kantor kt ON k.kantor_id = kt.id
                 LEFT JOIN hr_golongan_gaji gg ON k.golongan_gaji_id = gg.id
+                LEFT JOIN users u ON k.user_id = u.id
                 WHERE 1=1";
         
         $params = [];
@@ -66,6 +67,17 @@ try {
         $result = $stmt->get_result();
         $data = $result->fetch_all(MYSQLI_ASSOC);
         
+        echo json_encode(['success' => true, 'data' => $data]);
+
+    } elseif ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_stats') {
+        $sql = "SELECT 
+                    COUNT(CASE WHEN status = 'aktif' THEN 1 END) as aktif,
+                    COUNT(CASE WHEN status = 'nonaktif' THEN 1 END) as nonaktif,
+                    COUNT(CASE WHEN status = 'probation' THEN 1 END) as probation,
+                    COUNT(*) as total
+                FROM hr_karyawan";
+        $result = $conn->query($sql);
+        $data = $result->fetch_assoc();
         echo json_encode(['success' => true, 'data' => $data]);
 
     } elseif ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_org_chart_data') {
@@ -145,6 +157,46 @@ try {
             echo json_encode(['success' => false, 'message' => 'Karyawan tidak ditemukan']);
         }
 
+    } elseif ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_available_users') {
+        // Ambil daftar user yang belum terhubung dengan karyawan lain
+        // Atau sudah terhubung dengan karyawan yang sedang diedit
+        $karyawan_id = !empty($_GET['karyawan_id']) ? (int)$_GET['karyawan_id'] : null;
+        
+        if ($karyawan_id === null) {
+            // MODE ADD: Ambil semua user yang belum terhubung dengan karyawan manapun
+            $sql = "SELECT u.id, u.username, u.nama_lengkap, u.role
+                    FROM users u
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM hr_karyawan hk
+                        WHERE hk.user_id = u.id
+                    )
+                    ORDER BY u.username ASC";
+            
+            $stmt = $conn->prepare($sql);
+            $stmt->execute();
+        } else {
+            // MODE EDIT: Ambil user yang belum terhubung dengan karyawan lain
+            // Kecuali user yang sudah terhubung dengan karyawan yang sedang diedit
+            $sql = "SELECT u.id, u.username, u.nama_lengkap, u.role
+                    FROM users u
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM hr_karyawan hk
+                        WHERE hk.user_id = u.id
+                        AND hk.id != ?
+                    )
+                    ORDER BY u.username ASC";
+            
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $karyawan_id);
+            $stmt->execute();
+        }
+        
+        $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        
+        echo json_encode(['success' => true, 'data' => $data]);
+
     } elseif ($method === 'POST' && isset($_POST['action']) && $_POST['action'] === 'get_probation_history') {
         $karyawan_id = (int)$_POST['karyawan_id'];
         
@@ -179,8 +231,12 @@ try {
         $action = $_POST['action'] ?? '';
 
         if ($action === 'save') {
+            // Generate request ID for logging
+            $request_id = uniqid('req_');
+            
             // Validasi Input
             if (empty($_POST['nip']) || empty($_POST['nama_lengkap'])) {
+                error_log("[$request_id] Validation failed: NIP or nama lengkap empty");
                 throw new Exception("NIP dan Nama Lengkap wajib diisi.");
             }
 
@@ -193,13 +249,75 @@ try {
             $divisi_id = !empty($_POST['divisi_id']) ? (int)$_POST['divisi_id'] : null;
             $kantor_id = !empty($_POST['kantor_id']) ? (int)$_POST['kantor_id'] : null;
             $golongan_gaji_id = !empty($_POST['golongan_gaji_id']) ? (int)$_POST['golongan_gaji_id'] : null;
-            $tanggal_masuk = $_POST['tanggal_masuk'];
+            $tanggal_lahir = !empty($_POST['tanggal_lahir']) ? $_POST['tanggal_lahir'] : null;
+            // Konversi format tanggal dari DD/MM/YYYY ke YYYY-MM-DD jika diperlukan
+            if ($tanggal_lahir && preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $tanggal_lahir)) {
+                error_log("[$request_id] Converting date from DD/MM/YYYY to YYYY-MM-DD: $tanggal_lahir");
+                $date = DateTime::createFromFormat('d/m/Y', $tanggal_lahir);
+                if ($date !== false) {
+                    $tanggal_lahir = $date->format('Y-m-d');
+                    error_log("[$request_id] Converted date: $tanggal_lahir");
+                } else {
+                    error_log("[$request_id] Date conversion failed: $tanggal_lahir");
+                    throw new Exception("Format tanggal lahir tidak valid.");
+                }
+            }
+            $no_hp = !empty($_POST['no_hp']) ? trim($_POST['no_hp']) : null;
+            $email = !empty($_POST['email']) ? trim($_POST['email']) : null;
+            $tanggal_masuk = !empty($_POST['tanggal_masuk']) ? $_POST['tanggal_masuk'] : null;
+            if (!$tanggal_masuk) {
+                throw new Exception("Tanggal masuk wajib diisi.");
+            }
             $tanggal_berakhir_kontrak = !empty($_POST['tanggal_berakhir_kontrak']) ? $_POST['tanggal_berakhir_kontrak'] : null;
-            $status = $_POST['status'] ?? 'aktif';
-            $npwp = $_POST['npwp'] ?? null;
+            $status = !empty($_POST['status']) ? $_POST['status'] : 'aktif';
+            $npwp = !empty($_POST['npwp']) ? trim($_POST['npwp']) : null;
             $status_ptkp = $_POST['status_ptkp'] ?? 'TK/0';
             $ikut_bpjs_kes = isset($_POST['ikut_bpjs_kes']) ? 1 : 0;
             $ikut_bpjs_tk = isset($_POST['ikut_bpjs_tk']) ? 1 : 0;
+            $user_id = !empty($_POST['user_id']) && $_POST['user_id'] !== '0' ? (int)$_POST['user_id'] : null;
+
+            // Validasi tanggal lahir (setelah konversi ke YYYY-MM-DD)
+            if ($tanggal_lahir) {
+                error_log("[$request_id] Validating tanggal_lahir: $tanggal_lahir");
+                $date = DateTime::createFromFormat('Y-m-d', $tanggal_lahir);
+                if ($date === false) {
+                    error_log("[$request_id] Date format invalid after conversion: $tanggal_lahir");
+                    throw new Exception("Format tanggal lahir tidak valid.");
+                }
+                // Check for errors like 31 February
+                $errors = DateTime::getLastErrors();
+                if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
+                    error_log("[$request_id] Date calendar error: " . print_r($errors, true));
+                    throw new Exception("Tanggal lahir tidak valid.");
+                }
+                // Tanggal lahir boleh di masa depan, jadi tidak ada validasi timestamp
+                error_log("[$request_id] Date validation passed");
+            }
+
+            // Validasi nomor HP
+            if ($no_hp) {
+                if (strlen($no_hp) > 20) {
+                    throw new Exception("Nomor HP maksimal 20 karakter.");
+                }
+                // Validasi format nomor Indonesia: 08xxxxxxxxxx atau +628xxxxxxxxxx
+                if (!preg_match('/^(\+62|0)[0-9]{8,20}$/', $no_hp)) {
+                    throw new Exception("Format nomor HP tidak valid. Gunakan format 08xxxxxxxxxx atau +628xxxxxxxxxx.");
+                }
+                // Cek tanda + ganda
+                if (substr_count($no_hp, '+') > 1) {
+                    throw new Exception("Nomor HP tidak boleh memiliki lebih dari satu tanda +.");
+                }
+            }
+
+            // Validasi email
+            if ($email) {
+                if (strlen($email) > 100) {
+                    throw new Exception("Email maksimal 100 karakter.");
+                }
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    throw new Exception("Format email tidak valid.");
+                }
+            }
 
             // Jika ID dikirim, verifikasi bahwa ID tersebut ada di database
             if ($id) {
@@ -233,11 +351,46 @@ try {
             }
             $stmt_check->close();
 
+            // Validasi user_id jika dipilih
+            if ($user_id) {
+                // Cek apakah user_id ada di tabel users
+                $stmt_user_check = $conn->prepare("SELECT id FROM users WHERE id = ?");
+                $stmt_user_check->bind_param("i", $user_id);
+                $stmt_user_check->execute();
+                if ($stmt_user_check->get_result()->num_rows == 0) {
+                    $stmt_user_check->close();
+                    throw new Exception("Akun pengguna tidak ditemukan.");
+                }
+                $stmt_user_check->close();
+
+                // Cek apakah user_id sudah terhubung dengan karyawan lain
+                $sql_user_check = "SELECT id FROM hr_karyawan WHERE user_id = ?";
+                $params_user_check = [$user_id];
+                $types_user_check = "i";
+
+                if ($id) {
+                    $sql_user_check .= " AND id != ?";
+                    $params_user_check[] = $id;
+                    $types_user_check .= "i";
+                }
+
+                $stmt_user_check2 = $conn->prepare($sql_user_check);
+                $stmt_user_check2->bind_param($types_user_check, ...$params_user_check);
+                $stmt_user_check2->execute();
+                if ($stmt_user_check2->get_result()->num_rows > 0) {
+                    $stmt_user_check2->close();
+                    throw new Exception("Akun pengguna ini sudah terhubung dengan karyawan lain.");
+                }
+                $stmt_user_check2->close();
+            }
+
             // Mulai transaksi database untuk operasi INSERT/UPDATE yang aman
+            error_log("[$request_id] Starting transaction");
             $conn->begin_transaction();
 
             try {
                 if ($id) {
+                    error_log("[$request_id] UPDATE mode: karyawan_id=$id");
                     // UPDATE - Pastikan ID valid dan ditemukan
                     if ($atasan_id == $id) {
                         throw new Exception("Karyawan tidak bisa menjadi atasan untuk dirinya sendiri.");
@@ -282,13 +435,21 @@ try {
                     }
 
                     // Update Data
-                    $stmt = $conn->prepare("UPDATE hr_karyawan SET nip=?, nama_lengkap=?, jabatan_id=?, atasan_id=?, jadwal_kerja_id=?, divisi_id=?, kantor_id=?, golongan_gaji_id=?, tanggal_masuk=?, tanggal_berakhir_kontrak=?, status=?, npwp=?, status_ptkp=?, ikut_bpjs_kes=?, ikut_bpjs_tk=? WHERE id=?");
-                    $stmt->bind_param("ssiiiiiisssssiii", $nip, $nama_lengkap, $jabatan_id, $atasan_id, $jadwal_kerja_id, $divisi_id, $kantor_id, $golongan_gaji_id, $tanggal_masuk, $tanggal_berakhir_kontrak, $status, $npwp, $status_ptkp, $ikut_bpjs_kes, $ikut_bpjs_tk, $id);
+                    try {
+                        $stmt = $conn->prepare("UPDATE hr_karyawan SET nip=?, nama_lengkap=?, email=?, no_hp=?, tanggal_lahir=?, jabatan_id=?, atasan_id=?, jadwal_kerja_id=?, divisi_id=?, kantor_id=?, golongan_gaji_id=?, tanggal_masuk=?, tanggal_berakhir_kontrak=?, user_id=?, status=?, npwp=?, status_ptkp=?, ikut_bpjs_kes=?, ikut_bpjs_tk=? WHERE id=?");
+                        $stmt->bind_param("sssssiiiiiississsiii", $nip, $nama_lengkap, $email, $no_hp, $tanggal_lahir, $jabatan_id, $atasan_id, $jadwal_kerja_id, $divisi_id, $kantor_id, $golongan_gaji_id, $tanggal_masuk, $tanggal_berakhir_kontrak, $user_id, $status, $npwp, $status_ptkp, $ikut_bpjs_kes, $ikut_bpjs_tk, $id);
 
-                    if (!$stmt->execute()) {
-                        throw new Exception("Gagal mengupdate data: " . $stmt->error);
+                        if (!$stmt->execute()) {
+                            throw new Exception("Gagal mengupdate data: " . $stmt->error);
+                        }
+                        $stmt->close();
+                    } catch (Exception $e) {
+                        // Cek duplicate key error (error code 1062)
+                        if ($e instanceof mysqli_sql_exception && $e->getCode() == 1062) {
+                            throw new Exception("Akun pengguna ini sudah terhubung dengan karyawan lain.");
+                        }
+                        throw $e;
                     }
-                    $stmt->close();
 
                     // After successful update, check if jabatan changed
                     if ($old_jabatan_id != $jabatan_id && $jabatan_id !== null) {
@@ -306,21 +467,36 @@ try {
                     }
                 } else {
                     // INSERT - ID kosong, buat data baru
-                    $stmt = $conn->prepare("INSERT INTO hr_karyawan (nip, nama_lengkap, jabatan_id, atasan_id, jadwal_kerja_id, divisi_id, kantor_id, golongan_gaji_id, tanggal_masuk, tanggal_berakhir_kontrak, status, npwp, status_ptkp, ikut_bpjs_kes, ikut_bpjs_tk) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("ssiiiiiisssssii", $nip, $nama_lengkap, $jabatan_id, $atasan_id, $jadwal_kerja_id, $divisi_id, $kantor_id, $golongan_gaji_id, $tanggal_masuk, $tanggal_berakhir_kontrak, $status, $npwp, $status_ptkp, $ikut_bpjs_kes, $ikut_bpjs_tk);
+                    error_log("[$request_id] INSERT mode");
+                    try {
+                        $stmt = $conn->prepare("INSERT INTO hr_karyawan (nip, nama_lengkap, email, no_hp, tanggal_lahir, jabatan_id, atasan_id, jadwal_kerja_id, divisi_id, kantor_id, golongan_gaji_id, tanggal_masuk, tanggal_berakhir_kontrak, user_id, status, npwp, status_ptkp, ikut_bpjs_kes, ikut_bpjs_tk) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        error_log("[$request_id] INSERT prepared statement ready");
+                        $stmt->bind_param("sssssiiiiiississsii", $nip, $nama_lengkap, $email, $no_hp, $tanggal_lahir, $jabatan_id, $atasan_id, $jadwal_kerja_id, $divisi_id, $kantor_id, $golongan_gaji_id, $tanggal_masuk, $tanggal_berakhir_kontrak, $user_id, $status, $npwp, $status_ptkp, $ikut_bpjs_kes, $ikut_bpjs_tk);
+                        error_log("[$request_id] INSERT bind_param done");
 
-                    if (!$stmt->execute()) {
-                        throw new Exception("Gagal menyimpan data: " . $stmt->error);
-                    }
-                    $stmt->close();
+                        if (!$stmt->execute()) {
+                            $error = $stmt->error;
+                            $stmt->close();
+                            error_log("[$request_id] INSERT execute failed: $error");
+                            throw new Exception("Gagal menyimpan data: " . $error);
+                        }
+                        $stmt->close();
+                        error_log("[$request_id] INSERT execute success");
 
-                    $karyawan_id = $conn->insert_id;
-                    // Insert initial job history
-                    if ($jabatan_id) {
-                        $stmt_hist = $conn->prepare("INSERT INTO hr_riwayat_jabatan (karyawan_id, jabatan_id, tanggal_mulai) VALUES (?, ?, ?)");
-                        $stmt_hist->bind_param("iis", $karyawan_id, $jabatan_id, $tanggal_masuk);
-                        $stmt_hist->execute();
-                        $stmt_hist->close();
+                        $karyawan_id = $conn->insert_id;
+                        // Insert initial job history
+                        if ($jabatan_id) {
+                            $stmt_hist = $conn->prepare("INSERT INTO hr_riwayat_jabatan (karyawan_id, jabatan_id, tanggal_mulai) VALUES (?, ?, ?)");
+                            $stmt_hist->bind_param("iis", $karyawan_id, $jabatan_id, $tanggal_masuk);
+                            $stmt_hist->execute();
+                            $stmt_hist->close();
+                        }
+                    } catch (Exception $e) {
+                        // Cek duplicate key error (error code 1062)
+                        if ($e instanceof mysqli_sql_exception && $e->getCode() == 1062) {
+                            throw new Exception("Akun pengguna ini sudah terhubung dengan karyawan lain.");
+                        }
+                        throw $e;
                     }
                 }
 

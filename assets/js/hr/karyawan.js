@@ -7,6 +7,7 @@ function initKaryawanPage() {
         loadJadwalKerjaOptions();
         loadKantorOptions();
         loadGolonganGajiOptions();
+        // Don't load users here, load when modal opens
 
         // Event Listeners
         const searchInput = document.getElementById('search-karyawan');
@@ -101,6 +102,18 @@ function loadKaryawan() {
     const search = document.getElementById('search-karyawan').value;
     const status = document.getElementById('filter-status').value;
     const tbody = document.getElementById('karyawan-table-body');
+
+    // Load stats
+    fetch(`${basePath}/api/hr/karyawan?action=get_stats`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('stat-aktif').textContent = data.data.aktif || 0;
+                document.getElementById('stat-nonaktif').textContent = data.data.nonaktif || 0;
+                document.getElementById('stat-probation').textContent = data.data.probation || 0;
+                document.getElementById('stat-total').textContent = data.data.total || 0;
+            }
+        });
 
     // Menggunakan basePath dari global variable (header.php)
     fetch(`${basePath}/api/hr/karyawan?search=${encodeURIComponent(search)}&status=${status}`)
@@ -408,12 +421,39 @@ function loadGolonganGajiOptions() {
         });
 }
 
+function loadAvailableUsers(karyawanId = null, userIdToSelect = null) {
+    const url = `${basePath}/api/hr/karyawan?action=get_available_users&karyawan_id=${karyawanId || ''}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const select = document.getElementById('user_id');
+                if (select) {
+                    select.innerHTML = '<option value="">Belum Dihubungkan</option>';
+                    data.data.forEach(user => {
+                        const option = `<option value="${user.id}">${user.username} - ${user.nama_lengkap || 'N/A'}</option>`;
+                        select.insertAdjacentHTML('beforeend', option);
+                    });
+                    // Set selected value after dropdown loaded
+                    if (userIdToSelect !== null && userIdToSelect !== '') {
+                        select.value = userIdToSelect;
+                    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load available users:', error);
+        });
+}
+
 function openKaryawanModal(reset = true) {
     if (reset) {
         document.getElementById('karyawan-form').reset();
         document.getElementById('karyawan-id').value = '';
         document.getElementById('karyawan-action').value = 'save';
         document.getElementById('modal-title').innerText = 'Tambah Karyawan';
+        loadAvailableUsers(null, ''); // Load users untuk tambah
     }
     document.getElementById('karyawanModal').classList.remove('hidden');
 }
@@ -435,6 +475,9 @@ function editKaryawan(item) {
     document.getElementById('kantor_id').value = item.kantor_id || '';
     document.getElementById('golongan_gaji_id').value = item.golongan_gaji_id || '';
     document.getElementById('jadwal_kerja_id').value = item.jadwal_kerja_id || '';
+    document.getElementById('tanggal_lahir').value = item.tanggal_lahir || '';
+    document.getElementById('no_hp').value = item.no_hp || '';
+    document.getElementById('email').value = item.email || '';
     document.getElementById('tanggal_masuk').value = item.tanggal_masuk || '';
     document.getElementById('tanggal_berakhir_kontrak').value = item.tanggal_berakhir_kontrak || '';
     document.getElementById('status').value = item.status || 'aktif';
@@ -442,6 +485,10 @@ function editKaryawan(item) {
     document.getElementById('status_ptkp').value = item.status_ptkp || 'TK/0';
     document.getElementById('ikut_bpjs_kes').checked = item.ikut_bpjs_kes == 1;
     document.getElementById('ikut_bpjs_tk').checked = item.ikut_bpjs_tk == 1;
+    
+    // Load available users untuk edit (exclude current karyawan)
+    // Pass user_id to select after dropdown loaded
+    loadAvailableUsers(item.id, item.user_id || '');
 }
 
 function saveKaryawan() {
@@ -449,18 +496,31 @@ function saveKaryawan() {
     const formData = new FormData(form);
     addCsrfToken(formData);
 
+    // Cegah double submission
+    const saveBtn = document.getElementById('save-karyawan-btn');
+    if (saveBtn && saveBtn.disabled) return;
+    if (saveBtn) saveBtn.disabled = true;
+
     fetch(`${basePath}/api/hr/karyawan`, {
         method: 'POST',
         body: formData
     })
-        .then(response => {
-            if (!response.ok) {
-                return response.text().then(text => {
+        .then(async response => {
+            const text = await response.text();
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            } catch (e) {
+                if (!response.ok) {
                     console.error('Server Error Response:', text);
-                    throw new Error(text);
-                });
+                    throw new Error('Terjadi kesalahan pada server.');
+                }
+                throw e;
             }
-            return response.json();
+            if (!response.ok && !parsed.message) {
+                throw new Error('Terjadi kesalahan pada server.');
+            }
+            return parsed;
         })
         .then(data => {
             if (data.success) {
@@ -488,9 +548,12 @@ function saveKaryawan() {
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: error.message,
+                text: error.message || 'Terjadi kesalahan saat menyimpan data',
                 confirmButtonColor: '#EF4444'
             });
+        })
+        .finally(() => {
+            if (saveBtn) saveBtn.disabled = false;
         });
 }
 

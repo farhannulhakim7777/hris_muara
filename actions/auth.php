@@ -40,6 +40,7 @@ try {
         // MODIFIED: Gunakan role_name dari tabel roles, bukan kolom 'role' yang lama
         // Pastikan lowercase agar sesuai dengan pengecekan di menu (misal: 'kasir')
         $_SESSION['role'] = strtolower($user['role_name'] ?? 'user');
+        $_SESSION['role_id'] = $user['role_id'];
 
         // Handle "Remember Me"
         if (!empty($_POST['remember_me'])) {
@@ -96,8 +97,12 @@ try {
 
         log_activity($user['username'], 'Login', 'Login berhasil.');
 
-        // Redirect ke halaman dashboard yang sebenarnya
-        header('Location: ' . base_url('/dashboard'));
+        // Redirect sesuai role user
+        if ((int)$user['role_id'] === 4 || $_SESSION['role'] === 'karyawan') {
+            header('Location: ' . base_url('/hr/portal/dashboard'));
+        } else {
+            header('Location: ' . base_url('/dashboard'));
+        }
         exit;
     } else {
         // Jika semua upaya login gagal

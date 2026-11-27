@@ -199,6 +199,25 @@ if (!$is_spa_request) {
                         </div>
                     </div>
 
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-5 mt-5 bg-slate-50 dark:bg-slate-900/50 p-5 rounded-xl">
+                        <h4 class="text-sm font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><i class="bi bi-person-badge text-blue-500"></i> Informasi Pribadi</h4>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+                            <div>
+                                <label for="tanggal_lahir" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tanggal Lahir</label>
+                                <input type="date" name="tanggal_lahir" id="tanggal_lahir" class="block w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white transition-all duration-200">
+                            </div>
+                            <div>
+                                <label for="no_hp" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nomor HP</label>
+                                <input type="tel" name="no_hp" id="no_hp" maxlength="20" class="block w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white dark:placeholder-slate-400 transition-all duration-200" placeholder="08xxxxxxxxxx atau +62xxxxxxxxxx">
+                            </div>
+                            <div>
+                                <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+                                <input type="email" name="email" id="email" maxlength="100" class="block w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white dark:placeholder-slate-400 transition-all duration-200" placeholder="email@contoh.com">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
                         <div>
                             <label for="tanggal_masuk" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"><i class="bi bi-calendar-event mr-2 text-slate-400"></i>Tgl Masuk</label>
@@ -213,6 +232,8 @@ if (!$is_spa_request) {
                             <select name="status" id="status" class="block w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white transition-all duration-200">
                                 <option value="aktif">Aktif</option>
                                 <option value="nonaktif">Nonaktif</option>
+                                <option value="probation">Probation</option>
+                                <option value="kontrak">Kontrak</option>
                             </select>
                         </div>
                     </div>
@@ -246,6 +267,17 @@ if (!$is_spa_request) {
                         <div class="flex items-center">
                             <input type="checkbox" name="ikut_bpjs_tk" id="ikut_bpjs_tk" value="1" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 rounded cursor-pointer">
                             <label for="ikut_bpjs_tk" class="ml-2 block text-sm text-slate-700 dark:text-slate-300">Ikut BPJS Ketenagakerjaan</label>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 dark:border-slate-700 pt-5 mt-5 bg-slate-50 dark:bg-slate-900/50 p-5 rounded-xl">
+                        <h4 class="text-sm font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><i class="bi bi-person-check text-blue-500"></i> Akun Pengguna</h4>
+                        <div class="mb-3">
+                            <label for="user_id" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Akun Pengguna</label>
+                            <select name="user_id" id="user_id" class="block w-full px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white transition-all duration-200">
+                                <option value="">Belum Dihubungkan</option>
+                            </select>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">Akun pengguna harus dibuat terlebih dahulu melalui menu Manajemen Pengguna.</p>
                         </div>
                     </div>
                 </form>

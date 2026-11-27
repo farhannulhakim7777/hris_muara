@@ -6,6 +6,9 @@ if (!$is_spa_request) {
 ?>
 
 <div class="space-y-6">
+    <!-- CSRF Token Backup for Portal Form/AJAX -->
+    <input type="hidden" id="portal_csrf_token" value="<?= htmlspecialchars(get_csrf_token()) ?>">
+
     <!-- Header & Status Hari Ini -->
     <div class="bg-white dark:bg-gray-800 shadow rounded-xl p-6 border border-gray-200 dark:border-gray-700">
         <div class="flex flex-col md:flex-row justify-between items-center gap-4">
